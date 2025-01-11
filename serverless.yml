@@ -1,0 +1,112 @@
+org: humbertoneto
+app: teste
+service: stark-bank
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: sa-east-1
+  stage: dev 
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:GetItem
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:DeleteItem
+      Resource:
+        - arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/LambdaMetrics
+        - arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/LambdaErrorsLog
+    - Effect: Allow
+      Action:
+        - events:PutRule
+        - events:PutTargets
+        - events:RemoveTargets
+        - events:DeleteRule
+        - lambda:AddPermission
+        - lambda:RemovePermission
+      Resource:
+        - arn:aws:events:${self:provider.region}:${aws:accountId}:rule/SelfSchedulerRule
+        - arn:aws:lambda:${self:provider.region}:${aws:accountId}:function:stark-bank-dev-generateInvoiceLammbda
+
+
+functions:
+  generateInvoiceLammbda:
+    handler: lambdas/generate_invoices.lambda_handler
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
+    description: "Generate Stark Bank Invoices"
+    memorySize: 128
+    timeout: 30
+    environment:
+      PRIVATE_KEY: ${env:PRIVATE_KEY}
+      DYNAMO_TABLE_NAME: ${self:custom.lambdaMetricsTableName}
+      ACCOUNT_ID: ${aws:accountId}
+      REGION: ${self:provider.region}
+  handleWebhook:
+    handler: lambdas/handle_webhook.lambda_handler
+    layers:
+      - Ref: PythonRequirementsLambdaLayer
+    memorySize: 128
+    timeout: 30
+    description: "Handle Invoice webhook callback"
+    url:
+      cors:
+        allowedOrigins:
+          - https://g5gugd3ls64mymq4e4ste5ovou0fbswu.lambda-url.sa-east-1.on.aws
+
+package:
+  include:
+    - lambda/**
+    - dynamo/**
+    - utils/**
+  exclude:
+    - .env
+    - node_modules/**
+    - .venv/**
+
+resources:
+  Resources:
+    LambdaMetrics:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: LambdaMetrics
+        AttributeDefinitions:
+          - AttributeName: lambdaName
+            AttributeType: S
+        KeySchema:
+          - AttributeName: lambdaName
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+      DeletionPolicy: Retain
+    LambdaErrorsLog:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: LambdaErrorsLog
+        AttributeDefinitions:
+          - AttributeName: lambdaName
+            AttributeType: S
+          - AttributeName: executionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: lambdaName
+            KeyType: HASH
+          - AttributeName: executionId
+            KeyType: RANGE
+        BillingMode: PAY_PER_REQUEST
+      DeletionPolicy: Retain
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    usePoetry: true               
+    requirePoetryLockFile: true
+    dockerizePip: non-linux
+    slim: true
+    zip: true                
+    layer: true
+  lambdaMetricsTableName: LambdaMetrics

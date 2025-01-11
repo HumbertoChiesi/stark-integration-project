@@ -1,0 +1,27 @@
+[project]
+name = "stark-bank"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "HumbertoChiesi",email = "66853228+HumbertoChiesi@users.noreply.github.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy (>=2.2.1,<3.0.0)",
+    "starkbank (>=2.26.0,<3.0.0)",
+    "boto3 (>=1.35.96,<2.0.0)",
+    "pydantic (>=2.10.5,<3.0.0)"
+]
+
+[tool.poetry]
+name = "stark-bank"
+packages = [
+    { include = "stark-project/db" },
+    { include = "stark-project/lambdas" },
+    { include = "stark-project/utils" },
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
